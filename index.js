@@ -72,6 +72,7 @@ module.exports = function(/*options, callback*/) {
 
 
       return packageJson.java.dependencies.forEach(function(d) {
+        d.repositories = options.repositories;
         dependencyQueuePush(Dependency.createFromObject(d, 'package.json'));
       });
     });
@@ -197,73 +198,79 @@ module.exports = function(/*options, callback*/) {
   } // END resolveDependency
 
   function resolvePom(dependency, callback) {
-    var pomPath = path.resolve(options.localRepository, dependency.getPomPath());
-    return fs.exists(pomPath, function(exists) {
-      if (exists) {
-        return readFile(dependency, pomPath, callback);
-      } else {
-        return download(dependency, pomPath, callback);
-      }
-    });
-
-    function download(dependency, pomPath, callback) {
-      return downloadFile(dependency.getPomPath(), pomPath, dependency.reason, function(err, url) {
-        if (err) {
-          return callback(err);
+    dependency.getPomPath(function (err, pom) {
+      if (err) return callback(err);
+      var pomPath = path.resolve(options.localRepository, pom);
+      return fs.exists(pomPath, function(exists) {
+        if (exists) {
+          return readFile(dependency, pomPath, callback);
+        } else {
+          return download(dependency, pomPath, callback);
         }
-        dependency.pomUrl = url;
-        return readFile(dependency, pomPath, callback);
       });
-    }
 
-    function readFile(dependency, pomPath, callback) {
-      dependency.pomPath = pomPath;
-      return fs.readFile(pomPath, 'utf8', function(err, data) {
-        if (err) {
-          return callback(err);
-        }
-        return loadFile(dependency, data, callback);
-      });
-    }
-
-    function loadFile(dependency, data, callback) {
-      xml2js.parseString(data, function(err, xml) {
-        if (err) {
-          return callback(err);
-        }
-        dependency.pomXml = xml;
-        if (dependency.getParent()) {
-          var parentDep = dependency.getParent();
-          debug("resolving parent: " + parentDep);
-          return resolvePom(parentDep, function(err, parentPomXml) {
-            if (err) {
-              return callback(err);
-            }
-            xml.project.parent[0].pomXml = parentPomXml;
-            return callback(null, xml);
-          });
-        }
-        return callback(null, xml);
-      });
-    }
-  } // END resolvePom
-
-  function resolveJar(dependency, callback) {
-    var jarPath = path.resolve(options.localRepository, dependency.getJarPath());
-    return fs.exists(jarPath, function(exists) {
-      if (exists) {
-        dependency.jarPath = jarPath;
-        return callback();
-      } else {
-        return downloadFile(dependency.getJarPath(), jarPath, dependency.reason, function(err, url) {
+      function download(dependency, pomPath, callback) {
+        return downloadFile(pom, pomPath, dependency.reason, function(err, url) {
           if (err) {
             return callback(err);
           }
-          dependency.jarUrl = url;
-          dependency.jarPath = jarPath;
-          return callback();
+          dependency.pomUrl = url;
+          return readFile(dependency, pomPath, callback);
         });
       }
+
+      function readFile(dependency, pomPath, callback) {
+        dependency.pomPath = pomPath;
+        return fs.readFile(pomPath, 'utf8', function(err, data) {
+          if (err) {
+            return callback(err);
+          }
+          return loadFile(dependency, data, callback);
+        });
+      }
+
+      function loadFile(dependency, data, callback) {
+        xml2js.parseString(data, function(err, xml) {
+          if (err) {
+            return callback(err);
+          }
+          dependency.pomXml = xml;
+          if (dependency.getParent()) {
+            var parentDep = dependency.getParent();
+            debug("resolving parent: " + parentDep);
+            return resolvePom(parentDep, function(err, parentPomXml) {
+              if (err) {
+                return callback(err);
+              }
+              xml.project.parent[0].pomXml = parentPomXml;
+              return callback(null, xml);
+            });
+          }
+          return callback(null, xml);
+        });
+      }
+    });
+  } // END resolvePom
+
+  function resolveJar(dependency, callback) {
+    dependency.getJarPath(function (err, jar) {
+      if (err) return callback(err);
+      var jarPath = path.resolve(options.localRepository, jar);
+      return fs.exists(jarPath, function(exists) {
+        if (exists) {
+          dependency.jarPath = jarPath;
+          return callback();
+        } else {
+          return downloadFile(jar, jarPath, dependency.reason, function(err, url) {
+            if (err) {
+              return callback(err);
+            }
+            dependency.jarUrl = url;
+            dependency.jarPath = jarPath;
+            return callback();
+          });
+        }
+      });
     });
   }
 
