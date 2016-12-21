@@ -185,7 +185,7 @@ module.exports = function(/*options, callback*/) {
             }
             return exclusion.groupId === d.groupId && exclusion.artifactId === d.artifactId;
           },false );
-          return d.scope != 'test' && d.optional != true  && !isExclusion;
+          return d.scope != 'test' && d.scope != 'provided' && d.optional != true  && !isExclusion;
         });
       if (childDependencies.length > 0) {
         childDependencies.forEach(function(d) {
