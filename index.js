@@ -33,7 +33,7 @@ module.exports = function(/*options, callback*/) {
   options.concurrency = options.concurrency || 1;
 
   var dependencies = {};
-  var exclusions = [];
+  var exclusions = options.exclusions || [];
   var errors = [];
 
   var dependencyQueue = async.queue(processDependency, options.concurrency);
@@ -65,7 +65,7 @@ module.exports = function(/*options, callback*/) {
         if (!(packageJson.java.exclusions instanceof Array)) {
           return callback(new Error("java.exclusions property in package.json must be an array."));
         } else {
-          exclusions = packageJson.java.exclusions;
+          exclusions = exclusions.concat(packageJson.java.exclusions);
         }
       }
 
